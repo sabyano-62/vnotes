@@ -696,9 +696,14 @@ function setVol(v){if(audioEl)audioEl.volume=v/100;}
 /* ── API KEY MANAGEMENT ── */
 function loadApiKey(){
   var k=localStorage.getItem('vn_oai_key')||'';
-  if(k){
-    document.getElementById('openai-key-input').value=k;
+  var inp=document.getElementById('openai-key-input');
+  if(!inp)return;
+  if(k&&k.startsWith('sk-')){
+    inp.value=k;
     showKeyStatus('saved');
+  }else{
+    inp.value='';
+    showKeyStatus('');
   }
 }
 function validateKeyInput(v){
@@ -709,9 +714,19 @@ function validateKeyInput(v){
 function saveApiKey(){
   var k=document.getElementById('openai-key-input').value.trim();
   if(!k.startsWith('sk-')){showKeyStatus('invalid');return;}
-  localStorage.setItem('vn_oai_key',k);
-  showKeyStatus('saved');
-  showToast('تم حفظ مفتاح API');
+  try{
+    localStorage.setItem('vn_oai_key',k);
+    var verify=localStorage.getItem('vn_oai_key');
+    if(verify===k){
+      showKeyStatus('saved');
+      showToast('تم حفظ مفتاح API بنجاح');
+    }else{
+      showKeyStatus('');
+      showToast('فشل الحفظ — المتصفح يمنع localStorage');
+    }
+  }catch(e){
+    showToast('خطأ في الحفظ: '+e.message);
+  }
 }
 function clearApiKey(){
   localStorage.removeItem('vn_oai_key');
@@ -732,10 +747,19 @@ function showKeyStatus(state){
 function aiTranscribe(btn){
   var ta=document.getElementById('note-text');
   var apiKey=localStorage.getItem('vn_oai_key')||'';
+  apiKey=apiKey.trim();
 
-  if(!apiKey){
+  if(!apiKey||!apiKey.startsWith('sk-')){
     showToast('أدخل مفتاح OpenAI في الإعدادات أولاً');
+    // Pre-fill the input if empty
+    var inp=document.getElementById('openai-key-input');
+    if(inp&&!inp.value) inp.value='';
     switchPage('settings');
+    // Scroll to key section
+    setTimeout(function(){
+      var el=document.getElementById('openai-key-input');
+      if(el){el.scrollIntoView({behavior:'smooth'});el.focus();}
+    },300);
     return;
   }
   if(!audioBlob&&!audioUrl){
@@ -768,12 +792,25 @@ function aiTranscribe(btn){
   }
 
   blobPromise.then(function(blob){
+    // DEBUG: show blob info in the text area
+    ta.value='[تشخيص] حجم الصوت: '+blob.size+' بايت | نوع: '+blob.type+'\nجارٍ الإرسال إلى Whisper...';
+
+    if(blob.size<100){
+      ta.value='[خطأ] الملف الصوتي فارغ أو صغير جداً ('+blob.size+' بايت). سجّل مجدداً.';
+      btn.disabled=false;
+      btn.innerHTML='<i class="ti ti-wand" aria-hidden="true"></i> نسخ ذكي';
+      return;
+    }
+
+    var ext='webm';
+    if(blob.type.includes('ogg'))ext='ogg';
+    else if(blob.type.includes('mp4'))ext='mp4';
+    else if(blob.type.includes('wav'))ext='wav';
+
     var formData=new FormData();
-    // Whisper needs a filename with extension
-    var ext=blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')?'mp4':'webm';
     formData.append('file',blob,'recording.'+ext);
     formData.append('model','whisper-1');
-    formData.append('language','ar'); // Arabic — remove this line for auto-detect
+    formData.append('language','ar');
     formData.append('response_format','text');
 
     fetch('https://api.openai.com/v1/audio/transcriptions',{
@@ -782,8 +819,11 @@ function aiTranscribe(btn){
       body:formData
     })
     .then(function(res){
+      ta.value+=' | HTTP: '+res.status;
       if(!res.ok){
-        return res.json().then(function(e){throw new Error(e.error&&e.error.message?e.error.message:'HTTP '+res.status);});
+        return res.text().then(function(t){
+          throw new Error('HTTP '+res.status+': '+t.substring(0,200));
+        });
       }
       return res.text();
     })
@@ -794,19 +834,19 @@ function aiTranscribe(btn){
       showToast('تم النسخ الذكي');
     })
     .catch(function(err){
-      ta.value='';
+      // Show full error in textarea for diagnosis
+      ta.value='[خطأ] '+( err.message||err.toString());
       btn.disabled=false;
       btn.innerHTML='<i class="ti ti-wand" aria-hidden="true"></i> نسخ ذكي';
       var msg=err.message||'';
       if(msg.includes('401')||msg.includes('Incorrect API key')){
-        showToast('مفتاح API غير صحيح — تحقق من الإعدادات');
-        showKeyStatus('invalid');
+        showToast('مفتاح API غير صحيح');showKeyStatus('invalid');
       }else if(msg.includes('429')){
-        showToast('تجاوزت الحد المسموح — حاول لاحقاً');
-      }else if(msg.includes('Failed to fetch')||msg.includes('NetworkError')){
-        showToast('لا يوجد اتصال بالإنترنت');
+        showToast('تجاوزت الحد — حاول لاحقاً');
+      }else if(msg.includes('Failed to fetch')||msg.includes('NetworkError')||msg.includes('ERR_')){
+        showToast('لا يوجد اتصال أو CORS مرفوض');
       }else{
-        showToast('خطأ: '+msg.substring(0,60));
+        showToast('خطأ: '+msg.substring(0,50));
       }
     });
   });

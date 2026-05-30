@@ -339,8 +339,8 @@
       </div>
       <div class="sec">
       <div class="sec">
-        <div class="sec-lbl"><i class="ti ti-brand-openai" aria-hidden="true"></i> مفتاح OpenAI للنسخ الذكي</div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6;">أدخل مفتاح OpenAI API لتفعيل النسخ الصوتي الحقيقي عبر Whisper. يُحفظ على جهازك فقط ولا يُشارك مع أحد.</div>
+        <div class="sec-lbl"><i class="ti ti-microphone" aria-hidden="true"></i> مفتاح Groq للنسخ الذكي المجاني</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6;">أدخل مفتاح Groq API المجاني لتفعيل النسخ الصوتي الفوري. احصل على مفتاح من <strong>console.groq.com</strong>. يُحفظ على جهازك فقط.</div>
         <div style="position:relative;margin-bottom:8px;">
           <input class="fi" type="password" id="openai-key-input" placeholder="sk-..." style="margin-bottom:0;padding-left:44px;" oninput="validateKeyInput(this.value)">
           <button class="auth-eye" onclick="toggleEye('openai-key-input','eye-oai')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);"><i class="ti ti-eye" id="eye-oai" aria-hidden="true"></i></button>
@@ -707,13 +707,13 @@ function loadApiKey(){
   }
 }
 function validateKeyInput(v){
-  if(v.startsWith('sk-')) showKeyStatus('valid');
+  if(v.startsWith('sk-')||v.startsWith('gsk_')) showKeyStatus('valid');
   else if(v.length>0) showKeyStatus('invalid');
   else showKeyStatus('');
 }
 function saveApiKey(){
   var k=document.getElementById('openai-key-input').value.trim();
-  if(!k.startsWith('sk-')){showKeyStatus('invalid');return;}
+  if(!k.startsWith('sk-')&&!k.startsWith('gsk_')){showKeyStatus('invalid');return;}
   try{
     localStorage.setItem('vn_oai_key',k);
     var verify=localStorage.getItem('vn_oai_key');
@@ -749,13 +749,11 @@ function aiTranscribe(btn){
   var apiKey=localStorage.getItem('vn_oai_key')||'';
   apiKey=apiKey.trim();
 
-  if(!apiKey||!apiKey.startsWith('sk-')){
-    showToast('أدخل مفتاح OpenAI في الإعدادات أولاً');
-    // Pre-fill the input if empty
+  if(!apiKey||(!apiKey.startsWith('sk-')&&!apiKey.startsWith('gsk_'))){
+    showToast('أدخل مفتاح Groq في الإعدادات أولاً');
     var inp=document.getElementById('openai-key-input');
     if(inp&&!inp.value) inp.value='';
     switchPage('settings');
-    // Scroll to key section
     setTimeout(function(){
       var el=document.getElementById('openai-key-input');
       if(el){el.scrollIntoView({behavior:'smooth'});el.focus();}
@@ -809,11 +807,11 @@ function aiTranscribe(btn){
 
     var formData=new FormData();
     formData.append('file',blob,'recording.'+ext);
-    formData.append('model','whisper-1');
+    formData.append('model','whisper-large-v3');
     formData.append('language','ar');
     formData.append('response_format','text');
 
-    fetch('https://api.openai.com/v1/audio/transcriptions',{
+    fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
       method:'POST',
       headers:{'Authorization':'Bearer '+apiKey},
       body:formData

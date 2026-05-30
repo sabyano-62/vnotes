@@ -338,6 +338,20 @@
         <button class="btn-g" onclick="installApp()"><i class="ti ti-download" aria-hidden="true"></i> تثبيت الآن</button>
       </div>
       <div class="sec">
+      <div class="sec">
+        <div class="sec-lbl"><i class="ti ti-brand-openai" aria-hidden="true"></i> مفتاح OpenAI للنسخ الذكي</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6;">أدخل مفتاح OpenAI API لتفعيل النسخ الصوتي الحقيقي عبر Whisper. يُحفظ على جهازك فقط ولا يُشارك مع أحد.</div>
+        <div style="position:relative;margin-bottom:8px;">
+          <input class="fi" type="password" id="openai-key-input" placeholder="sk-..." style="margin-bottom:0;padding-left:44px;" oninput="validateKeyInput(this.value)">
+          <button class="auth-eye" onclick="toggleEye('openai-key-input','eye-oai')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);"><i class="ti ti-eye" id="eye-oai" aria-hidden="true"></i></button>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:6px;">
+          <button class="btn-p" onclick="saveApiKey()" id="save-key-btn"><i class="ti ti-check" aria-hidden="true"></i> حفظ المفتاح</button>
+          <button class="btn-danger" onclick="clearApiKey()"><i class="ti ti-trash" aria-hidden="true"></i> حذف</button>
+        </div>
+        <div style="font-size:12px;min-height:18px;" id="key-status"></div>
+      </div>
+      <div class="sec">
         <div class="sec-lbl"><i class="ti ti-info-circle" aria-hidden="true"></i> حول التطبيق</div>
         <div style="font-size:13px;color:var(--text-secondary);line-height:1.9;">الملاحظات الصوتية — الإصدار 3.0<br>تسجيل حقيقي • نسخ ذكي • حماية بكلمة مرور</div>
       </div>
@@ -468,6 +482,7 @@ function showMainApp(){
   renderCurrentTags();renderNotesList();
   const ds=JSON.parse(localStorage.getItem('vn_settings')||'{}');
   if(ds.dark){darkMode=true;document.body.classList.add('dark');document.getElementById('dark-tog').classList.add('on');document.getElementById('dark-ic').className='ti ti-sun';}
+  loadApiKey();
 }
 
 function initAuth(){
@@ -678,8 +693,124 @@ function seekAudio(e){
 }
 function setVol(v){if(audioEl)audioEl.volume=v/100;}
 
-const txSamples=['تحدثنا اليوم عن خطة المشروع وتوزيع المهام بين أعضاء الفريق.','يجب شراء الحليب والخبز والخضروات الطازجة من السوق.','فكرة جديدة: إضافة وضع ليلي وتحسين تجربة المستخدم.','ملاحظة مهمة: اتصل بالعميل غداً لتأكيد موعد التسليم.'];
-function aiTranscribe(btn){const ta=document.getElementById('note-text');if(ta.value.trim()){showToast('النص موجود');return;}ta.value='جارٍ النسخ...';btn.disabled=true;setTimeout(()=>{ta.value=txSamples[Math.floor(Math.random()*txSamples.length)];btn.disabled=false;showToast('تم النسخ الذكي');},1000);}
+/* ── API KEY MANAGEMENT ── */
+function loadApiKey(){
+  var k=localStorage.getItem('vn_oai_key')||'';
+  if(k){
+    document.getElementById('openai-key-input').value=k;
+    showKeyStatus('saved');
+  }
+}
+function validateKeyInput(v){
+  if(v.startsWith('sk-')) showKeyStatus('valid');
+  else if(v.length>0) showKeyStatus('invalid');
+  else showKeyStatus('');
+}
+function saveApiKey(){
+  var k=document.getElementById('openai-key-input').value.trim();
+  if(!k.startsWith('sk-')){showKeyStatus('invalid');return;}
+  localStorage.setItem('vn_oai_key',k);
+  showKeyStatus('saved');
+  showToast('تم حفظ مفتاح API');
+}
+function clearApiKey(){
+  localStorage.removeItem('vn_oai_key');
+  document.getElementById('openai-key-input').value='';
+  showKeyStatus('');
+  showToast('تم حذف المفتاح');
+}
+function showKeyStatus(state){
+  var el=document.getElementById('key-status');
+  if(!el)return;
+  if(state==='saved') el.innerHTML='<span style="color:#22C55E;"><i class="ti ti-check" aria-hidden="true"></i> المفتاح محفوظ — النسخ الذكي مفعّل</span>';
+  else if(state==='valid') el.innerHTML='<span style="color:#7C3AED;"><i class="ti ti-check" aria-hidden="true"></i> صيغة المفتاح صحيحة</span>';
+  else if(state==='invalid') el.innerHTML='<span style="color:#EF4444;"><i class="ti ti-x" aria-hidden="true"></i> المفتاح يجب أن يبدأ بـ sk-</span>';
+  else el.innerHTML='';
+}
+
+/* ── REAL WHISPER TRANSCRIPTION ── */
+function aiTranscribe(btn){
+  var ta=document.getElementById('note-text');
+  var apiKey=localStorage.getItem('vn_oai_key')||'';
+
+  if(!apiKey){
+    showToast('أدخل مفتاح OpenAI في الإعدادات أولاً');
+    switchPage('settings');
+    return;
+  }
+  if(!audioBlob&&!audioUrl){
+    showToast('سجّل ملاحظة صوتية أولاً');
+    return;
+  }
+
+  btn.disabled=true;
+  btn.innerHTML='<i class="ti ti-loader" aria-hidden="true"></i> جارٍ النسخ...';
+  ta.value='جارٍ النسخ الذكي عبر Whisper...';
+
+  // Convert base64 audioUrl back to blob if needed
+  var blobPromise;
+  if(audioBlob){
+    blobPromise=Promise.resolve(audioBlob);
+  }else if(audioUrl&&audioUrl.startsWith('data:')){
+    // Convert base64 data URL to blob
+    var parts=audioUrl.split(',');
+    var mime=parts[0].match(/:(.*?);/)[1];
+    var binary=atob(parts[1]);
+    var arr=new Uint8Array(binary.length);
+    for(var i=0;i<binary.length;i++)arr[i]=binary.charCodeAt(i);
+    blobPromise=Promise.resolve(new Blob([arr],{type:mime}));
+  }else{
+    btn.disabled=false;
+    btn.innerHTML='<i class="ti ti-wand" aria-hidden="true"></i> نسخ ذكي';
+    ta.value='';
+    showToast('لا يوجد تسجيل صوتي');
+    return;
+  }
+
+  blobPromise.then(function(blob){
+    var formData=new FormData();
+    // Whisper needs a filename with extension
+    var ext=blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')?'mp4':'webm';
+    formData.append('file',blob,'recording.'+ext);
+    formData.append('model','whisper-1');
+    formData.append('language','ar'); // Arabic — remove this line for auto-detect
+    formData.append('response_format','text');
+
+    fetch('https://api.openai.com/v1/audio/transcriptions',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+apiKey},
+      body:formData
+    })
+    .then(function(res){
+      if(!res.ok){
+        return res.json().then(function(e){throw new Error(e.error&&e.error.message?e.error.message:'HTTP '+res.status);});
+      }
+      return res.text();
+    })
+    .then(function(text){
+      ta.value=text.trim()||'(لم يتم التعرف على أي كلام)';
+      btn.disabled=false;
+      btn.innerHTML='<i class="ti ti-wand" aria-hidden="true"></i> نسخ ذكي';
+      showToast('تم النسخ الذكي');
+    })
+    .catch(function(err){
+      ta.value='';
+      btn.disabled=false;
+      btn.innerHTML='<i class="ti ti-wand" aria-hidden="true"></i> نسخ ذكي';
+      var msg=err.message||'';
+      if(msg.includes('401')||msg.includes('Incorrect API key')){
+        showToast('مفتاح API غير صحيح — تحقق من الإعدادات');
+        showKeyStatus('invalid');
+      }else if(msg.includes('429')){
+        showToast('تجاوزت الحد المسموح — حاول لاحقاً');
+      }else if(msg.includes('Failed to fetch')||msg.includes('NetworkError')){
+        showToast('لا يوجد اتصال بالإنترنت');
+      }else{
+        showToast('خطأ: '+msg.substring(0,60));
+      }
+    });
+  });
+}
 function aiSummarize(){const text=document.getElementById('note-text').value.trim();if(!text){showToast('أدخل نصاً أولاً');return;}const s=document.getElementById('note-summary');s.value='جارٍ التلخيص...';setTimeout(()=>{s.value=text.length>80?text.substring(0,80)+'...':text;showToast('تم التلخيص');},600);}
 function addTag(){const i=document.getElementById('tag-inp');const v=i.value.trim();if(!v||currentTags.includes(v))return;currentTags.push(v);renderCurrentTags();i.value='';}
 function removeTag(i){currentTags.splice(i,1);renderCurrentTags();}

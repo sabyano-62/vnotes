@@ -686,33 +686,142 @@ function removeTag(i){currentTags.splice(i,1);renderCurrentTags();}
 function renderCurrentTags(){const w=document.getElementById('tags-wrap');w.innerHTML='';if(!currentTags.length){w.innerHTML='<span style="font-size:12px;color:var(--text-tertiary);">لا توجد وسوم</span>';return;}currentTags.forEach((t,i)=>{const p=document.createElement('span');p.className='tag-pill';p.innerHTML=`${t}<i class="ti ti-x" aria-hidden="true" style="font-size:11px;cursor:pointer;"></i>`;p.querySelector('i').onclick=()=>removeTag(i);w.appendChild(p);});}
 function aiTags(){const pool=['اجتماع','عمل','مهم','متابعة','فكرة','مشروع','تسوق','شخصي','عاجل'];let a=0;pool.forEach(t=>{if(!currentTags.includes(t)&&a<3){currentTags.push(t);a++;}});renderCurrentTags();showToast('تم إضافة '+a+' وسوم');}
 
-function saveNote(){
-  const title=document.getElementById('note-title').value.trim()||'ملاحظة جديدة';
-  const text=document.getElementById('note-text').value;
-  const summary=document.getElementById('note-summary').value;
-  const folder=document.getElementById('note-folder').value;
-  const dur=totalSecs||recSecs||0;
-  const now=new Date().toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'});
-  if(editingId!==null){const idx=notes.findIndex(n=>n.id===editingId);if(idx>-1)notes[idx]={...notes[idx],title,text,summary,folder,tags:[...currentTags],duration:fmtTime(dur),durationSecs:dur};cancelEdit();showToast('تم التحديث');}
-  else{notes.unshift({id:nextId++,title,text,summary,folder,tags:[...currentTags],duration:fmtTime(dur),durationSecs:dur,date:now});showToast('تم الحفظ');}
-  save();clearForm();renderNotesList();
+function blobToBase64(blob){
+  return new Promise(function(resolve){
+    var reader=new FileReader();
+    reader.onloadend=function(){resolve(reader.result);};
+    reader.readAsDataURL(blob);
+  });
 }
 
-function clearForm(){['note-title','note-text','note-summary'].forEach(id=>document.getElementById(id).value='');document.getElementById('note-folder').value='';currentTags=[];renderCurrentTags();recSecs=0;totalSecs=0;progress=0;audioBlob=null;audioEl=null;audioUrl=null;document.getElementById('prog-fill').style.width='0%';document.getElementById('timer-lbl').textContent='0:00 / 0:00';}
-function cancelEdit(){editingId=null;document.getElementById('edit-badge').style.display='none';document.getElementById('save-lbl').textContent='حفظ الملاحظة';document.getElementById('cancel-btn').style.display='none';clearForm();}
+function base64ToAudio(b64){
+  if(!b64)return null;
+  var au=new Audio(b64);
+  au.onended=function(){isPlaying=false;document.getElementById('play-ic').className='ti ti-player-play';clearInterval(playInt);progress=0;document.getElementById('prog-fill').style.width='0%';};
+  return au;
+}
 
-function editNote(id){const n=notes.find(x=>x.id===id);if(!n)return;editingId=id;switchPage('notes');document.getElementById('note-title').value=n.title;document.getElementById('note-text').value=n.text||'';document.getElementById('note-summary').value=n.summary||'';document.getElementById('note-folder').value=n.folder||'';currentTags=[...n.tags];renderCurrentTags();totalSecs=n.durationSecs||0;document.getElementById('timer-lbl').textContent='0:00 / '+fmtTime(totalSecs);document.getElementById('edit-badge').style.display='inline-flex';document.getElementById('save-lbl').textContent='حفظ التعديلات';document.getElementById('cancel-btn').style.display='flex';document.getElementById('pages').scrollTop=0;showToast('تعديل: '+n.title);}
-function deleteNote(id){if(!confirm('حذف هذه الملاحظة؟'))return;notes=notes.filter(n=>n.id!==id);if(editingId===id)cancelEdit();save();renderNotesList();showToast('تم الحذف');}
+function saveNote(){
+  var title=document.getElementById('note-title').value.trim()||'ملاحظة جديدة';
+  var text=document.getElementById('note-text').value;
+  var summary=document.getElementById('note-summary').value;
+  var folder=document.getElementById('note-folder').value;
+  var dur=totalSecs||recSecs||0;
+  var now=new Date().toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'});
 
-function renderNotesList(){
-  const list=document.getElementById('notes-list');
-  const display=showAll?notes:notes.slice(0,5);
-  if(!display.length){list.innerHTML='<div class="empty"><i class="ti ti-microphone" aria-hidden="true"></i>لا توجد ملاحظات بعد<br><span style="font-size:12px;margin-top:6px;display:block;">اضغط تسجيل للبدء</span></div>';return;}
-  list.innerHTML='';
-  display.forEach(n=>{const c=document.createElement('div');c.className='nc';const th=n.tags.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;">${n.tags.map(t=>`<span class="ntag">${t}</span>`).join('')}</div>`:'';c.innerHTML=`<div style="flex:1;"><div class="nt">${n.title}</div><div class="nm"><span>${n.duration}</span><span>${n.date}</span>${n.folder?`<span>${n.folder}</span>`:''}</div>${th}<div class="nc-actions"><button class="btn-o" style="padding:5px 12px;font-size:12px;" onclick="editNote(${n.id})"><i class="ti ti-edit" aria-hidden="true" style="font-size:12px;"></i> تعديل</button><button class="btn-danger" style="padding:5px 12px;font-size:12px;" onclick="deleteNote(${n.id})"><i class="ti ti-trash" aria-hidden="true" style="font-size:12px;"></i> حذف</button></div></div><div class="nic"><i class="ti ti-microphone" aria-hidden="true"></i></div>`;list.appendChild(c);});
+  function doSave(audioData){
+    if(editingId!==null){
+      var idx=notes.findIndex(function(n){return n.id===editingId;});
+      if(idx>-1){
+        notes[idx]=Object.assign({},notes[idx],{title:title,text:text,summary:summary,folder:folder,tags:currentTags.slice(),duration:fmtTime(dur),durationSecs:dur});
+        // only update audio if a new recording was made
+        if(audioData) notes[idx].audioData=audioData;
+      }
+      cancelEdit();showToast('تم التحديث');
+    }else{
+      var note={id:nextId++,title:title,text:text,summary:summary,folder:folder,tags:currentTags.slice(),duration:fmtTime(dur),durationSecs:dur,date:now,audioData:audioData||null};
+      notes.unshift(note);
+      showToast('تم الحفظ');
+    }
+    save();clearForm();renderNotesList();
+  }
+
+  if(audioBlob){
+    // Convert blob to base64 so it persists in localStorage
+    blobToBase64(audioBlob).then(function(b64){doSave(b64);}).catch(function(){doSave(null);});
+  }else{
+    doSave(null);
+  }
+}
+
+function clearForm(){
+  ['note-title','note-text','note-summary'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('note-folder').value='';
+  currentTags=[];renderCurrentTags();
+  recSecs=0;totalSecs=0;progress=0;audioBlob=null;audioEl=null;audioUrl=null;
+  document.getElementById('prog-fill').style.width='0%';
+  document.getElementById('timer-lbl').textContent='0:00 / 0:00';
+}
+
+function cancelEdit(){
+  editingId=null;
+  document.getElementById('edit-badge').style.display='none';
+  document.getElementById('save-lbl').textContent='حفظ الملاحظة';
+  document.getElementById('cancel-btn').style.display='none';
+  clearForm();
+}
+
+function editNote(id){
+  var n=notes.find(function(x){return x.id===id;});
+  if(!n)return;
+  editingId=id;
+  switchPage('notes');
+  document.getElementById('note-title').value=n.title;
+  document.getElementById('note-text').value=n.text||'';
+  document.getElementById('note-summary').value=n.summary||'';
+  document.getElementById('note-folder').value=n.folder||'';
+  currentTags=n.tags.slice();renderCurrentTags();
+  totalSecs=n.durationSecs||0;
+  document.getElementById('timer-lbl').textContent='0:00 / '+fmtTime(totalSecs);
+  // Restore saved audio so playback works
+  if(n.audioData){
+    audioEl=base64ToAudio(n.audioData);
+    audioUrl=n.audioData;
+  }else{
+    audioEl=null;audioUrl=null;
+  }
+  progress=0;document.getElementById('prog-fill').style.width='0%';
+  document.getElementById('edit-badge').style.display='inline-flex';
+  document.getElementById('save-lbl').textContent='حفظ التعديلات';
+  document.getElementById('cancel-btn').style.display='flex';
+  document.getElementById('pages').scrollTop=0;
+  showToast('تعديل: '+n.title);
+}
+
+function deleteNote(id){
+  if(!confirm('حذف هذه الملاحظة؟'))return;
+  notes=notes.filter(function(n){return n.id!==id;});
+  if(editingId===id)cancelEdit();
+  save();renderNotesList();showToast('تم الحذف');
 }
 
 function toggleShowAll(){showAll=!showAll;document.getElementById('show-all-lbl').textContent=showAll?'عرض أقل':'عرض الكل';renderNotesList();}
+
+function renderNotesList(){
+  var list=document.getElementById('notes-list');
+  var display=showAll?notes:notes.slice(0,5);
+  if(!display.length){list.innerHTML='<div class="empty"><i class="ti ti-microphone" aria-hidden="true"></i>لا توجد ملاحظات بعد<br><span style="font-size:12px;margin-top:6px;display:block;">اضغط تسجيل للبدء</span></div>';return;}
+  list.innerHTML='';
+  display.forEach(function(n){
+    var c=document.createElement('div');c.className='nc';
+    var th=n.tags.length?'<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;">'+n.tags.map(function(t){return'<span class="ntag">'+t+'</span>';}).join('')+'</div>':'';
+    var hasAudio=n.audioData?'<span style="color:#22C55E;font-size:11px;margin-right:4px;"><i class="ti ti-volume" aria-hidden="true"></i> صوت</span>':'';
+    var playBtn=n.audioData?'<button class="btn-p" style="padding:5px 12px;font-size:12px;" onclick="loadNoteAudio('+n.id+')"><i class="ti ti-player-play" aria-hidden="true" style="font-size:12px;"></i> تشغيل</button>':'';
+    c.innerHTML='<div style="flex:1;"><div class="nt">'+n.title+'</div><div class="nm"><span>'+n.duration+'</span><span>'+n.date+'</span>'+(n.folder?'<span>'+n.folder+'</span>':'')+hasAudio+'</div>'+th+'<div class="nc-actions">'+playBtn+'<button class="btn-o" style="padding:5px 12px;font-size:12px;" onclick="editNote('+n.id+')"><i class="ti ti-edit" aria-hidden="true" style="font-size:12px;"></i> تعديل</button><button class="btn-danger" style="padding:5px 12px;font-size:12px;" onclick="deleteNote('+n.id+')"><i class="ti ti-trash" aria-hidden="true" style="font-size:12px;"></i> حذف</button></div></div><div class="nic"><i class="ti ti-microphone" aria-hidden="true"></i></div>';
+    list.appendChild(c);
+  });
+}
+
+function loadNoteAudio(id){
+  var n=notes.find(function(x){return x.id===id;});
+  if(!n)return;
+  totalSecs=n.durationSecs||0;
+  progress=0;document.getElementById('prog-fill').style.width='0%';
+  document.getElementById('timer-lbl').textContent='0:00 / '+fmtTime(totalSecs);
+  if(n.audioData){
+    if(audioEl)audioEl.pause();
+    audioEl=base64ToAudio(n.audioData);
+    audioUrl=n.audioData;
+    showToast('جاهز للتشغيل');
+  }else{
+    audioEl=null;audioUrl=null;
+    showToast('لا يوجد تسجيل صوتي محفوظ');
+  }
+  isPlaying=false;document.getElementById('play-ic').className='ti ti-player-play';
+  clearInterval(playInt);
+  // Scroll to player
+  document.getElementById('pages').scrollTop=0;
+}
 function doSearch(q){const res=document.getElementById('search-results');if(!q.trim()){res.innerHTML='<div class="empty"><i class="ti ti-search" aria-hidden="true"></i>اكتب للبحث</div>';return;}const found=notes.filter(n=>(n.title+n.text+n.summary+n.tags.join(' ')).includes(q));if(!found.length){res.innerHTML='<div class="empty"><i class="ti ti-mood-sad" aria-hidden="true"></i>لا توجد نتائج</div>';return;}res.innerHTML='';found.forEach(n=>{const c=document.createElement('div');c.className='nc';c.innerHTML=`<div style="flex:1;"><div class="nt">${n.title}</div><div class="nm"><span>${n.duration}</span><span>${n.date}</span></div></div><button class="btn-o" style="padding:6px 12px;font-size:12px;align-self:center;" onclick="editNote(${n.id})"><i class="ti ti-edit" aria-hidden="true" style="font-size:12px;"></i></button>`;res.appendChild(c);});}
 
 function refreshFolders(){const list=document.getElementById('folder-list');list.innerHTML='';[...defaultFolders,...extraFolders].forEach(f=>{const cnt=notes.filter(n=>n.folder===f).length;const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--bg-secondary);border-radius:var(--radius-md);cursor:pointer;margin-bottom:6px;';row.innerHTML=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;"><i class="ti ti-folder" aria-hidden="true" style="color:var(--purple);font-size:20px;"></i>${f}</div><span style="font-size:12px;color:var(--text-tertiary);">${cnt}</span>`;row.onclick=()=>showFolderNotes(f);list.appendChild(row);});const nf=notes.filter(n=>!n.folder).length;const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--bg-secondary);border-radius:var(--radius-md);cursor:pointer;';row.innerHTML=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;"><i class="ti ti-folder" aria-hidden="true" style="color:var(--text-tertiary);font-size:20px;"></i>بدون مجلد</div><span style="font-size:12px;color:var(--text-tertiary);">${nf}</span>`;row.onclick=()=>showFolderNotes('');list.appendChild(row);}

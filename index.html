@@ -193,6 +193,12 @@
         <button class="btn-o" style="padding:7px 10px;font-size:12px;" onclick="document.getElementById('install-banner').style.display='none'"><i class="ti ti-x" aria-hidden="true"></i></button>
       </div>
       <div class="sec">
+        <!-- Permission banner (shown when mic not granted) -->
+        <div id="mic-permission-banner" style="display:none;background:var(--purple-light);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:12px;text-align:center;">
+          <div style="font-size:14px;font-weight:500;color:var(--purple-dark);margin-bottom:6px;"><i class="ti ti-microphone-off" aria-hidden="true"></i> الميكروفون غير مفعّل</div>
+          <div style="font-size:12px;color:var(--purple-dark);margin-bottom:10px;line-height:1.6;">يحتاج التطبيق إذن الميكروفون لتسجيل الملاحظات الصوتية</div>
+          <button class="btn-p" style="width:100%;justify-content:center;" onclick="requestMicPermission()"><i class="ti ti-microphone" aria-hidden="true"></i> السماح باستخدام الميكروفون</button>
+        </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
           <div id="rec-ind" class="ri" style="display:none;"><span class="rec-dot"></span><span id="rec-tl">0:00</span></div>
           <div style="display:flex;gap:8px;margin-right:auto;">
@@ -462,6 +468,12 @@ function showMainApp(){
   renderCurrentTags();renderNotesList();
   const ds=JSON.parse(localStorage.getItem('vn_settings')||'{}');
   if(ds.dark){darkMode=true;document.body.classList.add('dark');document.getElementById('dark-tog').classList.add('on');document.getElementById('dark-ic').className='ti ti-sun';}
+  // Check mic permission state on load
+  checkMicPermission().then(state=>{
+    if(state===false) showMicBanner(true);
+    else if(state===true) showMicBanner(false);
+    // if null (unknown/prompt), don't show banner — will be triggered on first record tap
+  });
 }
 
 function initAuth(){
@@ -507,18 +519,80 @@ function switchPage(name){
   if(name==='search'){setTimeout(()=>document.getElementById('search-inp').focus(),100);doSearch('');}
 }
 
-async function startRec(){
-  if(isRecording)return;
+async function checkMicPermission(){
+  try{
+    if(navigator.permissions){
+      const res=await navigator.permissions.query({name:'microphone'});
+      if(res.state==='denied'){
+        showMicBanner(true);return false;
+      }
+      if(res.state==='granted'){
+        showMicBanner(false);return true;
+      }
+    }
+    // prompt state or permissions API not available — try requesting
+    return null; // unknown, let startRec handle it
+  }catch(e){return null;}
+}
+
+function showMicBanner(show){
+  document.getElementById('mic-permission-banner').style.display=show?'block':'none';
+  document.getElementById('btn-rec').style.opacity=show?'0.4':'1';
+  document.getElementById('btn-rec').disabled=show;
+}
+
+async function requestMicPermission(){
+  const btn=document.getElementById('mic-permission-banner').querySelector('button');
+  btn.disabled=true;
+  btn.textContent='جارٍ طلب الإذن...';
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    stream.getTracks().forEach(t=>t.stop()); // just checking permission
+    showMicBanner(false);
+    document.getElementById('mic-status').innerHTML='<span style="color:#22C55E;font-size:12px;"><i class="ti ti-check" aria-hidden="true"></i> تم منح إذن الميكروفون</span>';
+    setTimeout(()=>{document.getElementById('mic-status').textContent='';},2000);
+    showToast('تم السماح بالميكروفون');
+  }catch(e){
+    btn.disabled=false;
+    btn.innerHTML='<i class="ti ti-microphone" aria-hidden="true"></i> السماح باستخدام الميكروفون';
+    showMicDeniedGuide();
+  }
+}
+
+function showMicDeniedGuide(){
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid=/Android/.test(navigator.userAgent);
+  let msg='';
+  if(isIOS) msg='iPhone: الإعدادات → Safari → الميكروفون → سماح';
+  else if(isAndroid) msg='Android: اضغط 🔒 في شريط العنوان → الأذونات → الميكروفون → سماح';
+  else msg='اضغط على أيقونة 🔒 بجانب الرابط → الأذونات → الميكروفون → سماح، ثم أعد تحميل الصفحة';
+  document.getElementById('mic-status').innerHTML=`<span style="color:#EF4444;font-size:12px;">${msg}</span>`;
+}
+
+async function startRec(){
+  if(isRecording)return;
+  // Check permission state first
+  const permState=await checkMicPermission();
+  if(permState===false){showMicDeniedGuide();return;} // definitely denied
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true,echoCancellation:true,noiseSuppression:true,sampleRate:44100});
     document.getElementById('mic-status').textContent='';
-    const mt=MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/ogg';
+    showMicBanner(false);
+    const mt=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/ogg';
     mediaRecorder=new MediaRecorder(stream,{mimeType:mt});
     audioChunks=[];
     mediaRecorder.ondataavailable=e=>{if(e.data.size>0)audioChunks.push(e.data);};
     mediaRecorder.onstop=()=>{audioBlob=new Blob(audioChunks,{type:mt});audioUrl=URL.createObjectURL(audioBlob);if(audioEl)audioEl.pause();audioEl=new Audio(audioUrl);audioEl.onended=()=>{isPlaying=false;document.getElementById('play-ic').className='ti ti-player-play';clearInterval(playInt);progress=0;document.getElementById('prog-fill').style.width='0%';};stream.getTracks().forEach(t=>t.stop());};
     mediaRecorder.start(100);beginRecUI();
-  }catch(e){document.getElementById('mic-status').innerHTML='<span style="color:#EF4444;font-size:12px;">يرجى السماح بالوصول للميكروفون</span>';beginRecUI(true);}
+  }catch(e){
+    if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'){
+      showMicBanner(true);showMicDeniedGuide();
+    }else if(e.name==='NotFoundError'){
+      document.getElementById('mic-status').innerHTML='<span style="color:#EF4444;font-size:12px;">لم يتم العثور على ميكروفون على هذا الجهاز</span>';
+    }else{
+      document.getElementById('mic-status').innerHTML='<span style="color:#EF4444;font-size:12px;">خطأ في الميكروفون: '+e.message+'</span>';
+    }
+  }
 }
 
 function beginRecUI(sim=false){

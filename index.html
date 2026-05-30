@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#7C3AED">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ملاحظاتي">
+<meta name="description" content="تطبيق الملاحظات الصوتية — تسجيل، نسخ ذكي، تنظيم">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>الملاحظات الصوتية</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+  :root {
+    --bg-primary:#ffffff; --bg-secondary:#f8f7ff; --bg-tertiary:#f3f2f8;
+    --text-primary:#1a1a2e; --text-secondary:#6b6b8a; --text-tertiary:#9999b3;
+    --border:rgba(0,0,0,0.1); --border-med:rgba(0,0,0,0.18);
+    --purple:#7C3AED; --purple-light:#EDE9FE; --purple-dark:#5B21B6;
+    --radius-md:8px; --radius-lg:12px; --radius-xl:20px;
+  }
+  body.dark {
+    --bg-primary:#1e1b2e; --bg-secondary:#16132a; --bg-tertiary:#120f24;
+    --text-primary:#f0eeff; --text-secondary:#a89ec8; --text-tertiary:#6b6080;
+    --border:rgba(255,255,255,0.1); --border-med:rgba(255,255,255,0.18);
+    --purple-light:#2d1f5e; --purple-dark:#c4b5fd;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{font-family:-apple-system,'Segoe UI',Tahoma,sans-serif;background:var(--bg-tertiary);color:var(--text-primary);min-height:100vh;min-height:100dvh;direction:rtl;}
+  .app{max-width:430px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;background:var(--bg-tertiary);}
+
+  /* ── AUTH SCREEN ── */
+  #auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;padding:24px;background:var(--bg-tertiary);}
+  .auth-card{background:var(--bg-primary);border-radius:24px;border:0.5px solid var(--border);padding:32px 24px;width:100%;max-width:360px;}
+  .auth-logo{width:68px;height:68px;border-radius:20px;background:var(--purple);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;color:#fff;font-size:32px;}
+  .auth-title{font-size:22px;font-weight:500;text-align:center;margin-bottom:6px;}
+  .auth-sub{font-size:14px;color:var(--text-secondary);text-align:center;margin-bottom:28px;line-height:1.6;}
+  .auth-label{font-size:12px;color:var(--text-secondary);margin-bottom:5px;}
+  .auth-input-wrap{position:relative;margin-bottom:14px;}
+  .auth-input{width:100%;border:0.5px solid var(--border-med);border-radius:var(--radius-md);padding:12px 14px;padding-left:44px;font-size:15px;background:var(--bg-secondary);color:var(--text-primary);outline:none;font-family:inherit;transition:border-color .2s;text-align:right;}
+  .auth-input:focus{border-color:var(--purple);}
+  .auth-input.error{border-color:#EF4444;}
+  .auth-eye{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-tertiary);cursor:pointer;font-size:18px;border:none;background:none;padding:2px;}
+  .auth-btn{width:100%;background:var(--purple);color:#fff;border:none;border-radius:var(--radius-xl);padding:14px;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:8px;}
+  .auth-btn:active{opacity:.85;transform:scale(.99);}
+  .auth-btn:disabled{background:#C4B5FD;cursor:not-allowed;}
+  .auth-error{font-size:13px;color:#EF4444;text-align:center;margin-top:10px;min-height:20px;}
+  .auth-switch{font-size:13px;color:var(--text-secondary);text-align:center;margin-top:18px;}
+  .auth-switch span{color:var(--purple);cursor:pointer;font-weight:500;}
+  .strength-bar-wrap{height:4px;background:var(--border);border-radius:2px;margin-top:-8px;margin-bottom:14px;overflow:hidden;}
+  .strength-bar{height:4px;border-radius:2px;transition:width .3s,background .3s;width:0%;}
+  .strength-label{font-size:11px;color:var(--text-tertiary);margin-top:3px;margin-bottom:10px;min-height:14px;}
+  .pin-dots{display:flex;gap:12px;justify-content:center;margin:16px 0;}
+  .pin-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border-med);transition:background .2s,border-color .2s;}
+  .pin-dot.filled{background:var(--purple);border-color:var(--purple);}
+  .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px;}
+  .num-btn{background:var(--bg-secondary);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;font-size:20px;font-weight:500;cursor:pointer;font-family:inherit;color:var(--text-primary);text-align:center;transition:background .15s;}
+  .num-btn:active{background:var(--purple-light);}
+  .num-btn.del{font-size:18px;color:var(--text-secondary);}
+
+  /* ── TOPBAR ── */
+  .topbar{background:var(--bg-primary);padding:14px 18px;padding-top:max(14px,env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:100;}
+  .topbar-title{font-size:18px;font-weight:500;}
+  .topbar-icon{color:var(--purple);font-size:22px;cursor:pointer;padding:4px;background:none;border:none;}
+  .pages{flex:1;overflow-y:auto;padding-bottom:80px;}
+  .page{display:none;flex-direction:column;padding-bottom:12px;}
+  .page.active{display:flex;}
+  .sec{background:var(--bg-primary);margin:8px 10px;border-radius:var(--radius-lg);padding:14px 16px;border:0.5px solid var(--border);}
+  .sec-lbl{font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .btn-p{background:var(--purple);color:#fff;border:none;border-radius:var(--radius-xl);padding:9px 16px;font-size:13px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:inherit;}
+  .btn-p:active{opacity:.82;transform:scale(.98);}
+  .btn-p:disabled{background:#C4B5FD;cursor:not-allowed;}
+  .btn-o{background:var(--bg-secondary);color:var(--text-primary);border:0.5px solid var(--border-med);border-radius:var(--radius-xl);padding:9px 16px;font-size:13px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:inherit;}
+  .btn-o:active{opacity:.75;transform:scale(.98);}
+  .btn-g{background:var(--bg-secondary);color:var(--purple);border:0.5px solid var(--border-med);border-radius:var(--radius-xl);padding:9px 14px;font-size:13px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;width:100%;justify-content:center;font-family:inherit;}
+  .btn-g:active{opacity:.75;}
+  .btn-danger{background:var(--bg-secondary);color:#EF4444;border:0.5px solid #FCA5A5;border-radius:var(--radius-xl);padding:7px 14px;font-size:13px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:inherit;}
+  .fi{width:100%;border:0.5px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;font-size:14px;background:var(--bg-secondary);color:var(--text-primary);outline:none;text-align:right;margin-bottom:10px;font-family:inherit;transition:border-color .2s;}
+  .fi:focus{border-color:var(--purple);}
+  textarea.fi{resize:none;min-height:60px;line-height:1.6;}
+  select.fi{cursor:pointer;appearance:none;}
+  .fl{font-size:12px;color:var(--text-secondary);margin-bottom:5px;}
+  .sw{position:relative;margin-bottom:10px;}
+  .sw i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:16px;pointer-events:none;}
+  .player{display:flex;align-items:center;gap:8px;background:var(--bg-secondary);border-radius:28px;padding:8px 12px;}
+  .pbtn{width:32px;height:32px;border-radius:50%;background:var(--bg-primary);border:0.5px solid var(--border-med);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+  .wf{display:flex;align-items:center;gap:2px;height:28px;width:56px;overflow:hidden;flex-shrink:0;}
+  .wb{border-radius:2px;background:var(--purple);width:3px;flex-shrink:0;transition:height .1s;}
+  .pw{flex:1;height:4px;background:var(--border);border-radius:2px;cursor:pointer;}
+  .pf{height:4px;background:var(--purple);border-radius:2px;transition:width .1s;}
+  .tt{font-size:11px;color:var(--text-secondary);direction:ltr;white-space:nowrap;}
+  .tag-pill{display:inline-flex;align-items:center;gap:4px;background:var(--purple-light);color:var(--purple-dark);border-radius:20px;padding:4px 10px;font-size:12px;margin:3px 2px;}
+  .tw{display:flex;flex-wrap:wrap;min-height:26px;margin-bottom:8px;}
+  .save-btn{background:var(--purple);color:#fff;border:none;border-radius:28px;padding:15px;font-size:15px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 10px 4px;font-family:inherit;}
+  .save-btn:active{opacity:.85;}
+  .nhdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 4px;}
+  .nc{background:var(--bg-primary);margin:4px 10px;border-radius:var(--radius-lg);padding:13px 14px;border:0.5px solid var(--border);display:flex;gap:10px;align-items:flex-start;}
+  .nic{width:38px;height:38px;border-radius:50%;background:var(--purple-light);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--purple);font-size:18px;}
+  .nt{font-size:14px;font-weight:500;margin-bottom:3px;color:var(--text-primary);}
+  .nm{font-size:11px;color:var(--text-tertiary);display:flex;gap:8px;flex-wrap:wrap;}
+  .ntag{background:var(--purple-light);color:var(--purple-dark);border-radius:20px;padding:1px 8px;font-size:11px;}
+  .nc-actions{display:flex;gap:6px;margin-top:8px;}
+  .nav{background:var(--bg-primary);border-top:0.5px solid var(--border);display:flex;justify-content:space-around;padding:10px 0;padding-bottom:max(10px,env(safe-area-inset-bottom));position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:100;}
+  .nvi{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;color:var(--text-tertiary);cursor:pointer;flex:1;padding:4px 0;border:none;background:none;font-family:inherit;}
+  .nvi.active{color:var(--purple);}
+  .nvi i{font-size:22px;}
+  .rec-dot{width:8px;height:8px;border-radius:50%;background:#EF4444;display:inline-block;animation:blink 1s infinite;}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+  .ri{font-size:12px;color:#EF4444;display:flex;align-items:center;gap:6px;}
+  .toast-wrap{position:fixed;bottom:85px;left:0;right:0;display:flex;justify-content:center;pointer-events:none;z-index:200;}
+  .toast{background:rgba(26,26,46,0.92);color:#fff;padding:9px 20px;border-radius:24px;font-size:13px;opacity:0;transition:opacity .3s;white-space:nowrap;}
+  .toast.show{opacity:1;}
+  .empty{text-align:center;padding:32px 20px;color:var(--text-tertiary);font-size:14px;}
+  .empty i{font-size:38px;display:block;margin-bottom:10px;color:#C4B5FD;}
+  .toggle{width:46px;height:26px;border-radius:13px;background:#D1D5DB;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;border:none;}
+  .toggle.on{background:var(--purple);}
+  .toggle::after{content:'';position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s;}
+  .toggle.on::after{transform:translateX(-20px);}
+  .search-bar{display:flex;align-items:center;gap:8px;background:var(--bg-primary);border:0.5px solid var(--border);border-radius:28px;padding:10px 16px;margin:8px 10px 0;}
+  .search-bar input{background:none;border:none;outline:none;flex:1;font-size:14px;color:var(--text-primary);text-align:right;font-family:inherit;}
+  .badge-edit{background:var(--purple-light);color:var(--purple-dark);font-size:11px;padding:2px 8px;border-radius:20px;}
+  #install-banner{display:none;}
+  .install-banner{background:var(--purple-light);border:0.5px solid var(--border);margin:8px 10px;border-radius:var(--radius-lg);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .install-banner-text{font-size:13px;color:var(--purple-dark);flex:1;}
+  .shake{animation:shake .4s;}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ AUTH SCREEN ═══════════════ -->
+<div id="auth-screen">
+  <div class="auth-card" id="auth-card">
+
+    <!-- Setup view -->
+    <div id="view-setup">
+      <div class="auth-logo"><i class="ti ti-microphone" aria-hidden="true"></i></div>
+      <div class="auth-title">مرحباً بك</div>
+      <div class="auth-sub">أنشئ كلمة مرور لحماية ملاحظاتك</div>
+
+      <div class="auth-label">كلمة المرور</div>
+      <div class="auth-input-wrap">
+        <input class="auth-input" type="password" id="setup-pw" placeholder="أدخل كلمة مرور" oninput="checkStrength(this.value)" onkeydown="if(event.key==='Enter')focusConfirm()">
+        <button class="auth-eye" onclick="toggleEye('setup-pw','eye1')" aria-label="إظهار/إخفاء"><i class="ti ti-eye" id="eye1" aria-hidden="true"></i></button>
+      </div>
+      <div class="strength-bar-wrap"><div class="strength-bar" id="strength-bar"></div></div>
+      <div class="strength-label" id="strength-label"></div>
+
+      <div class="auth-label">تأكيد كلمة المرور</div>
+      <div class="auth-input-wrap">
+        <input class="auth-input" type="password" id="setup-pw2" placeholder="أعد إدخال كلمة المرور" onkeydown="if(event.key==='Enter')doSetup()">
+        <button class="auth-eye" onclick="toggleEye('setup-pw2','eye2')" aria-label="إظهار/إخفاء"><i class="ti ti-eye" id="eye2" aria-hidden="true"></i></button>
+      </div>
+
+      <button class="auth-btn" onclick="doSetup()"><i class="ti ti-lock" aria-hidden="true"></i> إنشاء كلمة المرور</button>
+      <div class="auth-error" id="setup-error"></div>
+    </div>
+
+    <!-- Login view -->
+    <div id="view-login" style="display:none;">
+      <div class="auth-logo"><i class="ti ti-lock" aria-hidden="true"></i></div>
+      <div class="auth-title">أدخل كلمة المرور</div>
+      <div class="auth-sub" id="login-attempts-lbl">مرحباً بعودتك</div>
+
+      <div class="auth-input-wrap" style="margin-bottom:4px;">
+        <input class="auth-input" type="password" id="login-pw" placeholder="كلمة المرور" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="auth-eye" onclick="toggleEye('login-pw','eye3')" aria-label="إظهار/إخفاء"><i class="ti ti-eye" id="eye3" aria-hidden="true"></i></button>
+      </div>
+
+      <button class="auth-btn" onclick="doLogin()"><i class="ti ti-arrow-right" aria-hidden="true"></i> دخول</button>
+      <div class="auth-error" id="login-error"></div>
+      <div class="auth-switch">نسيت كلمة المرور؟ <span onclick="doReset()">إعادة ضبط التطبيق</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN APP ═══════════════ -->
+<div class="app" id="app" style="display:none;">
+  <div class="topbar">
+    <button class="topbar-icon" onclick="toggleDark()" aria-label="تبديل الوضع"><i class="ti ti-moon" id="dark-ic" aria-hidden="true"></i></button>
+    <div class="topbar-title" id="page-title">الملاحظات</div>
+    <button class="topbar-icon" onclick="lockApp()" aria-label="قفل التطبيق"><i class="ti ti-lock" aria-hidden="true"></i></button>
+  </div>
+
+  <div class="pages" id="pages">
+    <div id="page-notes" class="page active">
+      <div id="install-banner" class="install-banner">
+        <div class="install-banner-text"><i class="ti ti-download" style="font-size:14px;"></i> ثبّت التطبيق على شاشتك الرئيسية</div>
+        <button class="btn-p" style="padding:7px 14px;font-size:12px;" onclick="installApp()">تثبيت</button>
+        <button class="btn-o" style="padding:7px 10px;font-size:12px;" onclick="document.getElementById('install-banner').style.display='none'"><i class="ti ti-x" aria-hidden="true"></i></button>
+      </div>
+      <div class="sec">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div id="rec-ind" class="ri" style="display:none;"><span class="rec-dot"></span><span id="rec-tl">0:00</span></div>
+          <div style="display:flex;gap:8px;margin-right:auto;">
+            <button class="btn-o" onclick="stopRec()"><i class="ti ti-square" aria-hidden="true" style="font-size:13px;"></i> إيقاف</button>
+            <button class="btn-p" id="btn-rec" onclick="startRec()"><i class="ti ti-microphone" aria-hidden="true" style="font-size:13px;"></i> تسجيل</button>
+          </div>
+        </div>
+        <div id="mic-status" style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px;text-align:center;min-height:18px;"></div>
+        <div class="player">
+          <button class="pbtn" onclick="togglePlay()" aria-label="تشغيل/إيقاف"><i class="ti ti-player-play" id="play-ic" aria-hidden="true" style="font-size:14px;color:var(--purple);"></i></button>
+          <div class="wf" id="waveform"></div>
+          <div class="pw" id="prog-wrap" onclick="seekAudio(event)"><div class="pf" id="prog-fill" style="width:0%;"></div></div>
+          <span class="tt" id="timer-lbl">0:00 / 0:00</span>
+          <input type="range" min="0" max="100" value="80" step="1" style="width:46px;" oninput="setVol(this.value)" aria-label="الصوت">
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-lbl"><i class="ti ti-file-text" aria-hidden="true"></i> تفاصيل الملاحظة <span id="edit-badge" class="badge-edit" style="display:none;">تعديل</span></div>
+        <div class="fl">عنوان الملاحظة</div>
+        <input class="fi" type="text" id="note-title" placeholder="عنوان الملاحظة">
+        <div class="fl">المجلد</div>
+        <div class="sw">
+          <select class="fi" id="note-folder" style="margin-bottom:0;">
+            <option value="">بدون مجلد</option>
+            <option>العمل</option><option>الشخصية</option><option>الأفكار</option><option>المشاريع</option>
+          </select>
+          <i class="ti ti-chevron-down" aria-hidden="true"></i>
+        </div>
+        <div class="fl" style="margin-top:10px;">النص / النسخ</div>
+        <textarea class="fi" id="note-text" placeholder="النص أو النسخ التلقائي سيظهر هنا..."></textarea>
+        <div class="fl">الملخص</div>
+        <textarea class="fi" id="note-summary" placeholder="الملخص..." style="min-height:46px;"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-p" onclick="aiTranscribe(this)"><i class="ti ti-wand" aria-hidden="true"></i> نسخ ذكي</button>
+          <button class="btn-p" onclick="aiSummarize()"><i class="ti ti-sparkles" aria-hidden="true"></i> تلخيص</button>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-lbl"><i class="ti ti-tag" aria-hidden="true" style="color:var(--purple);"></i> الوسوم</div>
+        <div class="tw" id="tags-wrap"></div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
+          <input class="fi" type="text" id="tag-inp" placeholder="وسم جديد..." style="margin-bottom:0;flex:1;" onkeydown="if(event.key==='Enter')addTag()">
+          <button class="btn-p" onclick="addTag()"><i class="ti ti-plus" aria-hidden="true"></i></button>
+        </div>
+        <button class="btn-g" onclick="aiTags()"><i class="ti ti-bulb" aria-hidden="true"></i> استخراج وسوم ذكية</button>
+      </div>
+      <button class="save-btn" onclick="saveNote()"><i class="ti ti-check" aria-hidden="true"></i> <span id="save-lbl">حفظ الملاحظة</span></button>
+      <button class="btn-o" id="cancel-btn" style="display:none;margin:0 10px 8px;justify-content:center;" onclick="cancelEdit()"><i class="ti ti-x" aria-hidden="true"></i> إلغاء التعديل</button>
+      <div class="nhdr">
+        <div style="color:var(--purple);font-size:13px;cursor:pointer;" onclick="toggleShowAll()"><span id="show-all-lbl">عرض الكل</span></div>
+        <div style="font-size:15px;font-weight:500;">آخر الملاحظات</div>
+      </div>
+      <div id="notes-list"></div>
+    </div>
+
+    <div id="page-search" class="page">
+      <div class="search-bar">
+        <i class="ti ti-search" aria-hidden="true" style="color:var(--text-secondary);"></i>
+        <input type="text" id="search-inp" placeholder="ابحث في الملاحظات..." oninput="doSearch(this.value)" aria-label="بحث">
+      </div>
+      <div id="search-results" style="padding-top:4px;"></div>
+    </div>
+
+    <div id="page-folders" class="page">
+      <div class="sec">
+        <div class="sec-lbl"><i class="ti ti-folder" aria-hidden="true"></i> المجلدات</div>
+        <div id="folder-list"></div>
+        <button class="btn-g" style="margin-top:10px;" onclick="addFolder()"><i class="ti ti-plus" aria-hidden="true"></i> إضافة مجلد</button>
+      </div>
+      <div class="sec" id="folder-notes-sec" style="display:none;">
+        <div class="sec-lbl" id="folder-notes-lbl">ملاحظات المجلد</div>
+        <div id="folder-notes-list"></div>
+      </div>
+    </div>
+
+    <div id="page-tags" class="page">
+      <div class="sec">
+        <div class="sec-lbl"><i class="ti ti-tag" aria-hidden="true"></i> جميع الوسوم</div>
+        <div id="tags-page" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+      <div class="sec" id="tag-notes-sec" style="display:none;">
+        <div class="sec-lbl" id="tag-notes-lbl">ملاحظات الوسم</div>
+        <div id="tag-notes-list"></div>
+      </div>
+    </div>
+
+    <div id="page-settings" class="page">
+      <div class="sec">
+        <div class="sec-lbl"><i class="ti ti-settings" aria-hidden="true"></i> الإعدادات</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:0.5px solid var(--border);">
+          <div><div style="font-size:14px;">الوضع الليلي</div><div style="font-size:12px;color:var(--text-secondary);">تفعيل الوضع الداكن</div></div>
+          <button class="toggle" id="dark-tog" onclick="toggleDark()" aria-label="الوضع الداكن"></button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:0.5px solid var(--border);">
+          <div><div style="font-size:14px;">التلخيص التلقائي</div><div style="font-size:12px;color:var(--text-secondary);">تلخيص عند الحفظ</div></div>
+          <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:0.5px solid var(--border);">
+          <div><div style="font-size:14px;">الوسوم الذكية</div><div style="font-size:12px;color:var(--text-secondary);">اقتراح وسوم من النص</div></div>
+          <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:0.5px solid var(--border);">
+          <div><div style="font-size:14px;">تغيير كلمة المرور</div><div style="font-size:12px;color:var(--text-secondary);">تحديث كلمة المرور الحالية</div></div>
+          <button class="btn-o" style="padding:7px 14px;font-size:12px;" onclick="showChangePw()"><i class="ti ti-key" aria-hidden="true"></i> تغيير</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;">
+          <div><div style="font-size:14px;">حذف جميع الملاحظات</div><div style="font-size:12px;color:var(--text-secondary);">لا يمكن التراجع</div></div>
+          <button class="btn-danger" onclick="clearAll()"><i class="ti ti-trash" aria-hidden="true"></i> حذف الكل</button>
+        </div>
+      </div>
+      <div class="sec" id="change-pw-sec" style="display:none;">
+        <div class="sec-lbl"><i class="ti ti-key" aria-hidden="true"></i> تغيير كلمة المرور</div>
+        <div class="fl">كلمة المرور الحالية</div>
+        <div style="position:relative;margin-bottom:10px;">
+          <input class="fi" type="password" id="cp-old" placeholder="كلمة المرور الحالية" style="margin-bottom:0;padding-left:40px;">
+          <button class="auth-eye" onclick="toggleEye('cp-old','eye4')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);"><i class="ti ti-eye" id="eye4" aria-hidden="true"></i></button>
+        </div>
+        <div class="fl">كلمة المرور الجديدة</div>
+        <div style="position:relative;margin-bottom:10px;">
+          <input class="fi" type="password" id="cp-new" placeholder="كلمة المرور الجديدة" style="margin-bottom:0;padding-left:40px;">
+          <button class="auth-eye" onclick="toggleEye('cp-new','eye5')" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);"><i class="ti ti-eye" id="eye5" aria-hidden="true"></i></button>
+        </div>
+        <div class="fl">تأكيد كلمة المرور الجديدة</div>
+        <input class="fi" type="password" id="cp-new2" placeholder="تأكيد كلمة المرور">
+        <div style="display:flex;gap:8px;">
+          <button class="btn-p" onclick="doChangePw()"><i class="ti ti-check" aria-hidden="true"></i> حفظ</button>
+          <button class="btn-o" onclick="document.getElementById('change-pw-sec').style.display='none'"><i class="ti ti-x" aria-hidden="true"></i> إلغاء</button>
+        </div>
+        <div style="font-size:13px;color:#EF4444;margin-top:8px;min-height:18px;" id="cp-error"></div>
+      </div>
+      <div class="sec">
+        <div class="sec-lbl"><i class="ti ti-download" aria-hidden="true"></i> تثبيت التطبيق</div>
+        <p style="font-size:13px;color:var(--text-secondary);line-height:1.8;margin-bottom:10px;">
+          على <strong>iPhone/iPad</strong>: افتح في Safari ← زر المشاركة ← "إضافة إلى الشاشة الرئيسية"<br>
+          على <strong>Android</strong>: افتح في Chrome ← القائمة ← "إضافة إلى الشاشة الرئيسية"
+        </p>
+        <button class="btn-g" onclick="installApp()"><i class="ti ti-download" aria-hidden="true"></i> تثبيت الآن</button>
+      </div>
+      <div class="sec">
+        <div class="sec-lbl"><i class="ti ti-info-circle" aria-hidden="true"></i> حول التطبيق</div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.9;">الملاحظات الصوتية — الإصدار 3.0<br>تسجيل حقيقي • نسخ ذكي • حماية بكلمة مرور</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap"><div class="toast" id="toast"></div></div>
+
+  <nav class="nav">
+    <button class="nvi" onclick="switchPage('settings')" id="nav-settings"><i class="ti ti-settings" aria-hidden="true"></i>الإعدادات</button>
+    <button class="nvi" onclick="switchPage('tags')" id="nav-tags"><i class="ti ti-tag" aria-hidden="true"></i>الوسوم</button>
+    <button class="nvi" onclick="switchPage('folders')" id="nav-folders"><i class="ti ti-folder" aria-hidden="true"></i>المجلدات</button>
+    <button class="nvi active" onclick="switchPage('notes')" id="nav-notes"><i class="ti ti-microphone" aria-hidden="true"></i>الملاحظات</button>
+    <button class="nvi" onclick="switchPage('search')" id="nav-search"><i class="ti ti-search" aria-hidden="true"></i>البحث</button>
+  </nav>
+</div>
+
+<script>
+/* ═══════════ AUTH LOGIC ═══════════ */
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+const PW_KEY='vn_pw_hash';
+let loginAttempts=0;
+const MAX_ATTEMPTS=5;
+
+function toggleEye(inputId,iconId){
+  const inp=document.getElementById(inputId);
+  const ico=document.getElementById(iconId);
+  if(inp.type==='password'){inp.type='text';ico.className='ti ti-eye-off';}
+  else{inp.type='password';ico.className='ti ti-eye';}
+}
+
+function checkStrength(pw){
+  const bar=document.getElementById('strength-bar');
+  const lbl=document.getElementById('strength-label');
+  if(!pw){bar.style.width='0%';lbl.textContent='';return;}
+  let score=0;
+  if(pw.length>=6)score++;
+  if(pw.length>=10)score++;
+  if(/[A-Z]/.test(pw))score++;
+  if(/[0-9]/.test(pw))score++;
+  if(/[^A-Za-z0-9]/.test(pw))score++;
+  const levels=[
+    {w:'20%',bg:'#EF4444',t:'ضعيفة جداً'},
+    {w:'40%',bg:'#F97316',t:'ضعيفة'},
+    {w:'60%',bg:'#EAB308',t:'متوسطة'},
+    {w:'80%',bg:'#22C55E',t:'قوية'},
+    {w:'100%',bg:'#16A34A',t:'قوية جداً'},
+  ];
+  const l=levels[Math.min(score,4)];
+  bar.style.width=l.w;bar.style.background=l.bg;
+  lbl.textContent='قوة كلمة المرور: '+l.t;lbl.style.color=l.bg;
+}
+
+function focusConfirm(){document.getElementById('setup-pw2').focus();}
+
+async function doSetup(){
+  const pw=document.getElementById('setup-pw').value;
+  const pw2=document.getElementById('setup-pw2').value;
+  const err=document.getElementById('setup-error');
+  if(pw.length<6){err.textContent='كلمة المرور يجب أن تكون 6 أحرف على الأقل';return;}
+  if(pw!==pw2){err.textContent='كلمتا المرور غير متطابقتين';document.getElementById('setup-pw2').classList.add('error');return;}
+  err.textContent='';
+  const hash=await sha256(pw);
+  localStorage.setItem(PW_KEY,hash);
+  showMainApp();
+}
+
+async function doLogin(){
+  const pw=document.getElementById('login-pw').value;
+  const err=document.getElementById('login-error');
+  if(!pw){err.textContent='أدخل كلمة المرور';return;}
+  if(loginAttempts>=MAX_ATTEMPTS){err.textContent='تم تجاوز عدد المحاولات. أعد تشغيل التطبيق.';return;}
+  const hash=await sha256(pw);
+  const stored=localStorage.getItem(PW_KEY);
+  if(hash===stored){
+    loginAttempts=0;err.textContent='';showMainApp();
+  }else{
+    loginAttempts++;
+    const rem=MAX_ATTEMPTS-loginAttempts;
+    err.textContent=rem>0?`كلمة المرور غير صحيحة — تبقّى ${rem} محاولات`:'تم تجاوز الحد الأقصى للمحاولات';
+    document.getElementById('login-pw').classList.add('error');
+    document.getElementById('auth-card').classList.add('shake');
+    setTimeout(()=>{document.getElementById('auth-card').classList.remove('shake');document.getElementById('login-pw').classList.remove('error');},500);
+    document.getElementById('login-pw').value='';
+  }
+}
+
+function doReset(){
+  if(confirm('سيتم حذف جميع الملاحظات وكلمة المرور. هل أنت متأكد؟')){
+    localStorage.clear();location.reload();
+  }
+}
+
+async function doChangePw(){
+  const old=document.getElementById('cp-old').value;
+  const nw=document.getElementById('cp-new').value;
+  const nw2=document.getElementById('cp-new2').value;
+  const err=document.getElementById('cp-error');
+  const oldHash=await sha256(old);
+  if(oldHash!==localStorage.getItem(PW_KEY)){err.textContent='كلمة المرور الحالية غير صحيحة';return;}
+  if(nw.length<6){err.textContent='كلمة المرور الجديدة قصيرة جداً';return;}
+  if(nw!==nw2){err.textContent='كلمتا المرور الجديدتان غير متطابقتين';return;}
+  const newHash=await sha256(nw);
+  localStorage.setItem(PW_KEY,newHash);
+  err.textContent='';
+  ['cp-old','cp-new','cp-new2'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('change-pw-sec').style.display='none';
+  showToast('تم تغيير كلمة المرور');
+}
+
+function showChangePw(){document.getElementById('change-pw-sec').style.display='block';document.getElementById('cp-old').focus();}
+
+function lockApp(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('login-pw').value='';
+  document.getElementById('login-error').textContent='';
+  loginAttempts=0;
+}
+
+function showMainApp(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  renderCurrentTags();renderNotesList();
+  const ds=JSON.parse(localStorage.getItem('vn_settings')||'{}');
+  if(ds.dark){darkMode=true;document.body.classList.add('dark');document.getElementById('dark-tog').classList.add('on');document.getElementById('dark-ic').className='ti ti-sun';}
+}
+
+function initAuth(){
+  const stored=localStorage.getItem(PW_KEY);
+  if(stored){
+    document.getElementById('view-setup').style.display='none';
+    document.getElementById('view-login').style.display='block';
+    setTimeout(()=>document.getElementById('login-pw').focus(),200);
+  }else{
+    setTimeout(()=>document.getElementById('setup-pw').focus(),200);
+  }
+}
+
+/* ═══════════ APP LOGIC ═══════════ */
+const PAGES=['notes','search','folders','tags','settings'];
+const TITLES={notes:'الملاحظات',search:'البحث',folders:'المجلدات',tags:'الوسوم',settings:'الإعدادات'};
+let notes=JSON.parse(localStorage.getItem('vn_notes')||'[]');
+let nextId=parseInt(localStorage.getItem('vn_nextid')||'1');
+let currentTags=[],editingId=null,showAll=false,darkMode=false;
+let isPlaying=false,isRecording=false,playInt=null,recSecs=0,totalSecs=0,progress=0;
+let mediaRecorder=null,audioChunks=[],audioBlob=null,audioUrl=null,audioEl=null,wfAnim=null;
+const extraFolders=JSON.parse(localStorage.getItem('vn_folders')||'[]');
+const defaultFolders=['العمل','الشخصية','الأفكار','المشاريع'];
+let deferredPrompt=null;
+
+function save(){localStorage.setItem('vn_notes',JSON.stringify(notes));localStorage.setItem('vn_nextid',String(nextId));localStorage.setItem('vn_folders',JSON.stringify(extraFolders));localStorage.setItem('vn_settings',JSON.stringify({dark:darkMode}));}
+
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('install-banner').style.display='flex';});
+window.addEventListener('appinstalled',()=>{document.getElementById('install-banner').style.display='none';showToast('تم تثبيت التطبيق');});
+async function installApp(){if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;}else showToast('افتح القائمة ← أضف إلى الشاشة الرئيسية');}
+
+const wfEl=document.getElementById('waveform');
+for(let i=0;i<16;i++){const b=document.createElement('div');b.className='wb';b.style.height=(4+Math.random()*16)+'px';b.style.opacity='0.4';wfEl.appendChild(b);}
+
+function fmtTime(s){s=Math.round(s||0);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+
+function switchPage(name){
+  PAGES.forEach(p=>{document.getElementById('page-'+p).classList.toggle('active',p===name);document.getElementById('nav-'+p).classList.toggle('active',p===name);});
+  document.getElementById('page-title').textContent=TITLES[name];
+  document.getElementById('pages').scrollTop=0;
+  if(name==='folders')refreshFolders();
+  if(name==='tags')refreshTagsPage();
+  if(name==='search'){setTimeout(()=>document.getElementById('search-inp').focus(),100);doSearch('');}
+}
+
+async function startRec(){
+  if(isRecording)return;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    document.getElementById('mic-status').textContent='';
+    const mt=MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/ogg';
+    mediaRecorder=new MediaRecorder(stream,{mimeType:mt});
+    audioChunks=[];
+    mediaRecorder.ondataavailable=e=>{if(e.data.size>0)audioChunks.push(e.data);};
+    mediaRecorder.onstop=()=>{audioBlob=new Blob(audioChunks,{type:mt});audioUrl=URL.createObjectURL(audioBlob);if(audioEl)audioEl.pause();audioEl=new Audio(audioUrl);audioEl.onended=()=>{isPlaying=false;document.getElementById('play-ic').className='ti ti-player-play';clearInterval(playInt);progress=0;document.getElementById('prog-fill').style.width='0%';};stream.getTracks().forEach(t=>t.stop());};
+    mediaRecorder.start(100);beginRecUI();
+  }catch(e){document.getElementById('mic-status').innerHTML='<span style="color:#EF4444;font-size:12px;">يرجى السماح بالوصول للميكروفون</span>';beginRecUI(true);}
+}
+
+function beginRecUI(sim=false){
+  isRecording=true;recSecs=0;
+  document.getElementById('rec-ind').style.display='flex';
+  document.getElementById('btn-rec').disabled=true;
+  if(sim)document.getElementById('mic-status').innerHTML='<span style="font-size:12px;color:var(--purple);">وضع المحاكاة</span>';
+  wfAnim=setInterval(()=>{recSecs++;document.getElementById('rec-tl').textContent=fmtTime(recSecs);document.getElementById('timer-lbl').textContent=fmtTime(recSecs)+' / تسجيل';document.querySelectorAll('.wb').forEach(b=>{b.style.height=(3+Math.random()*22)+'px';b.style.opacity=String(.35+Math.random()*.65);});},1000);
+}
+
+function stopRec(){
+  if(!isRecording)return;
+  isRecording=false;clearInterval(wfAnim);
+  if(mediaRecorder&&mediaRecorder.state!=='inactive')mediaRecorder.stop();
+  document.getElementById('rec-ind').style.display='none';
+  document.getElementById('btn-rec').disabled=false;
+  totalSecs=recSecs;
+  document.getElementById('timer-lbl').textContent='0:00 / '+fmtTime(totalSecs);
+  progress=0;document.getElementById('prog-fill').style.width='0%';
+  showToast('تم التسجيل: '+fmtTime(recSecs));
+}
+
+function togglePlay(){
+  if(audioEl){
+    if(isPlaying){audioEl.pause();isPlaying=false;document.getElementById('play-ic').className='ti ti-player-play';clearInterval(playInt);}
+    else{audioEl.currentTime=audioEl.duration*(progress/100)||0;audioEl.play();isPlaying=true;document.getElementById('play-ic').className='ti ti-player-pause';playInt=setInterval(()=>{if(audioEl.duration){progress=(audioEl.currentTime/audioEl.duration)*100;document.getElementById('prog-fill').style.width=progress+'%';document.getElementById('timer-lbl').textContent=fmtTime(audioEl.currentTime)+' / '+fmtTime(audioEl.duration);}},200);}
+  }else if(totalSecs>0){
+    if(isPlaying){isPlaying=false;document.getElementById('play-ic').className='ti ti-player-play';clearInterval(playInt);}
+    else{isPlaying=true;document.getElementById('play-ic').className='ti ti-player-pause';playInt=setInterval(()=>{progress=Math.min(100,progress+(100/totalSecs)*0.1);document.getElementById('prog-fill').style.width=progress+'%';const c=Math.round(progress/100*totalSecs);document.getElementById('timer-lbl').textContent=fmtTime(c)+' / '+fmtTime(totalSecs);if(progress>=100){isPlaying=false;document.getElementById('play-ic').className='ti ti-player-play';clearInterval(playInt);progress=0;document.getElementById('prog-fill').style.width='0%';}},100);}
+  }
+}
+
+function seekAudio(e){
+  if(!totalSecs&&!audioEl)return;
+  const r=document.getElementById('prog-wrap').getBoundingClientRect();
+  const pct=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  if(audioEl&&audioEl.duration)audioEl.currentTime=pct*audioEl.duration;
+  progress=pct*100;document.getElementById('prog-fill').style.width=progress+'%';
+  const dur=audioEl&&audioEl.duration?audioEl.duration:totalSecs;
+  document.getElementById('timer-lbl').textContent=fmtTime(pct*dur)+' / '+fmtTime(dur);
+}
+function setVol(v){if(audioEl)audioEl.volume=v/100;}
+
+const txSamples=['تحدثنا اليوم عن خطة المشروع وتوزيع المهام بين أعضاء الفريق.','يجب شراء الحليب والخبز والخضروات الطازجة من السوق.','فكرة جديدة: إضافة وضع ليلي وتحسين تجربة المستخدم.','ملاحظة مهمة: اتصل بالعميل غداً لتأكيد موعد التسليم.'];
+function aiTranscribe(btn){const ta=document.getElementById('note-text');if(ta.value.trim()){showToast('النص موجود');return;}ta.value='جارٍ النسخ...';btn.disabled=true;setTimeout(()=>{ta.value=txSamples[Math.floor(Math.random()*txSamples.length)];btn.disabled=false;showToast('تم النسخ الذكي');},1000);}
+function aiSummarize(){const text=document.getElementById('note-text').value.trim();if(!text){showToast('أدخل نصاً أولاً');return;}const s=document.getElementById('note-summary');s.value='جارٍ التلخيص...';setTimeout(()=>{s.value=text.length>80?text.substring(0,80)+'...':text;showToast('تم التلخيص');},600);}
+function addTag(){const i=document.getElementById('tag-inp');const v=i.value.trim();if(!v||currentTags.includes(v))return;currentTags.push(v);renderCurrentTags();i.value='';}
+function removeTag(i){currentTags.splice(i,1);renderCurrentTags();}
+function renderCurrentTags(){const w=document.getElementById('tags-wrap');w.innerHTML='';if(!currentTags.length){w.innerHTML='<span style="font-size:12px;color:var(--text-tertiary);">لا توجد وسوم</span>';return;}currentTags.forEach((t,i)=>{const p=document.createElement('span');p.className='tag-pill';p.innerHTML=`${t}<i class="ti ti-x" aria-hidden="true" style="font-size:11px;cursor:pointer;"></i>`;p.querySelector('i').onclick=()=>removeTag(i);w.appendChild(p);});}
+function aiTags(){const pool=['اجتماع','عمل','مهم','متابعة','فكرة','مشروع','تسوق','شخصي','عاجل'];let a=0;pool.forEach(t=>{if(!currentTags.includes(t)&&a<3){currentTags.push(t);a++;}});renderCurrentTags();showToast('تم إضافة '+a+' وسوم');}
+
+function saveNote(){
+  const title=document.getElementById('note-title').value.trim()||'ملاحظة جديدة';
+  const text=document.getElementById('note-text').value;
+  const summary=document.getElementById('note-summary').value;
+  const folder=document.getElementById('note-folder').value;
+  const dur=totalSecs||recSecs||0;
+  const now=new Date().toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'});
+  if(editingId!==null){const idx=notes.findIndex(n=>n.id===editingId);if(idx>-1)notes[idx]={...notes[idx],title,text,summary,folder,tags:[...currentTags],duration:fmtTime(dur),durationSecs:dur};cancelEdit();showToast('تم التحديث');}
+  else{notes.unshift({id:nextId++,title,text,summary,folder,tags:[...currentTags],duration:fmtTime(dur),durationSecs:dur,date:now});showToast('تم الحفظ');}
+  save();clearForm();renderNotesList();
+}
+
+function clearForm(){['note-title','note-text','note-summary'].forEach(id=>document.getElementById(id).value='');document.getElementById('note-folder').value='';currentTags=[];renderCurrentTags();recSecs=0;totalSecs=0;progress=0;audioBlob=null;audioEl=null;audioUrl=null;document.getElementById('prog-fill').style.width='0%';document.getElementById('timer-lbl').textContent='0:00 / 0:00';}
+function cancelEdit(){editingId=null;document.getElementById('edit-badge').style.display='none';document.getElementById('save-lbl').textContent='حفظ الملاحظة';document.getElementById('cancel-btn').style.display='none';clearForm();}
+
+function editNote(id){const n=notes.find(x=>x.id===id);if(!n)return;editingId=id;switchPage('notes');document.getElementById('note-title').value=n.title;document.getElementById('note-text').value=n.text||'';document.getElementById('note-summary').value=n.summary||'';document.getElementById('note-folder').value=n.folder||'';currentTags=[...n.tags];renderCurrentTags();totalSecs=n.durationSecs||0;document.getElementById('timer-lbl').textContent='0:00 / '+fmtTime(totalSecs);document.getElementById('edit-badge').style.display='inline-flex';document.getElementById('save-lbl').textContent='حفظ التعديلات';document.getElementById('cancel-btn').style.display='flex';document.getElementById('pages').scrollTop=0;showToast('تعديل: '+n.title);}
+function deleteNote(id){if(!confirm('حذف هذه الملاحظة؟'))return;notes=notes.filter(n=>n.id!==id);if(editingId===id)cancelEdit();save();renderNotesList();showToast('تم الحذف');}
+
+function renderNotesList(){
+  const list=document.getElementById('notes-list');
+  const display=showAll?notes:notes.slice(0,5);
+  if(!display.length){list.innerHTML='<div class="empty"><i class="ti ti-microphone" aria-hidden="true"></i>لا توجد ملاحظات بعد<br><span style="font-size:12px;margin-top:6px;display:block;">اضغط تسجيل للبدء</span></div>';return;}
+  list.innerHTML='';
+  display.forEach(n=>{const c=document.createElement('div');c.className='nc';const th=n.tags.length?`<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;">${n.tags.map(t=>`<span class="ntag">${t}</span>`).join('')}</div>`:'';c.innerHTML=`<div style="flex:1;"><div class="nt">${n.title}</div><div class="nm"><span>${n.duration}</span><span>${n.date}</span>${n.folder?`<span>${n.folder}</span>`:''}</div>${th}<div class="nc-actions"><button class="btn-o" style="padding:5px 12px;font-size:12px;" onclick="editNote(${n.id})"><i class="ti ti-edit" aria-hidden="true" style="font-size:12px;"></i> تعديل</button><button class="btn-danger" style="padding:5px 12px;font-size:12px;" onclick="deleteNote(${n.id})"><i class="ti ti-trash" aria-hidden="true" style="font-size:12px;"></i> حذف</button></div></div><div class="nic"><i class="ti ti-microphone" aria-hidden="true"></i></div>`;list.appendChild(c);});
+}
+
+function toggleShowAll(){showAll=!showAll;document.getElementById('show-all-lbl').textContent=showAll?'عرض أقل':'عرض الكل';renderNotesList();}
+function doSearch(q){const res=document.getElementById('search-results');if(!q.trim()){res.innerHTML='<div class="empty"><i class="ti ti-search" aria-hidden="true"></i>اكتب للبحث</div>';return;}const found=notes.filter(n=>(n.title+n.text+n.summary+n.tags.join(' ')).includes(q));if(!found.length){res.innerHTML='<div class="empty"><i class="ti ti-mood-sad" aria-hidden="true"></i>لا توجد نتائج</div>';return;}res.innerHTML='';found.forEach(n=>{const c=document.createElement('div');c.className='nc';c.innerHTML=`<div style="flex:1;"><div class="nt">${n.title}</div><div class="nm"><span>${n.duration}</span><span>${n.date}</span></div></div><button class="btn-o" style="padding:6px 12px;font-size:12px;align-self:center;" onclick="editNote(${n.id})"><i class="ti ti-edit" aria-hidden="true" style="font-size:12px;"></i></button>`;res.appendChild(c);});}
+
+function refreshFolders(){const list=document.getElementById('folder-list');list.innerHTML='';[...defaultFolders,...extraFolders].forEach(f=>{const cnt=notes.filter(n=>n.folder===f).length;const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--bg-secondary);border-radius:var(--radius-md);cursor:pointer;margin-bottom:6px;';row.innerHTML=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;"><i class="ti ti-folder" aria-hidden="true" style="color:var(--purple);font-size:20px;"></i>${f}</div><span style="font-size:12px;color:var(--text-tertiary);">${cnt}</span>`;row.onclick=()=>showFolderNotes(f);list.appendChild(row);});const nf=notes.filter(n=>!n.folder).length;const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--bg-secondary);border-radius:var(--radius-md);cursor:pointer;';row.innerHTML=`<div style="display:flex;align-items:center;gap:8px;font-size:14px;"><i class="ti ti-folder" aria-hidden="true" style="color:var(--text-tertiary);font-size:20px;"></i>بدون مجلد</div><span style="font-size:12px;color:var(--text-tertiary);">${nf}</span>`;row.onclick=()=>showFolderNotes('');list.appendChild(row);}
+function showFolderNotes(f){const sec=document.getElementById('folder-notes-sec');sec.style.display='block';document.getElementById('folder-notes-lbl').textContent=(f||'بدون مجلد')+' — الملاحظات';const list=document.getElementById('folder-notes-list');list.innerHTML='';const filtered=notes.filter(n=>n.folder===f);if(!filtered.length){list.innerHTML='<div style="font-size:13px;color:var(--text-tertiary);padding:8px 0;">لا توجد ملاحظات هنا</div>';return;}filtered.forEach(n=>{const c=document.createElement('div');c.className='nc';c.innerHTML=`<div style="flex:1;"><div class="nt">${n.title}</div><div class="nm"><span>${n.duration}</span><span>${n.date}</span></div></div><div class="nc-actions"><button class="btn-o" style="padding:5px 12px;font-size:12px;" onclick="editNote(${n.id})"><i class="ti ti-edit" aria-hidden="true" style="font-size:12px;"></i></button><button class="btn-danger" style="padding:5px 12px;font-size:12px;" onclick="deleteNote(${n.id});refreshFolders();"><i class="ti ti-trash" aria-hidden="true" style="font-size:12px;"></i></button></div>`;list.appendChild(c);});}
+function addFolder(){const name=prompt('اسم المجلد الجديد:');if(name&&name.trim()&&![...defaultFolders,...extraFolders].includes(name.trim())){extraFolders.push(name.trim());const sel=document.getElementById('note-folder');const opt=document.createElement('option');opt.value=name.trim();opt.textContent=name.trim();sel.appendChild(opt);save();refreshFolders();showToast('تم إضافة المجلد');}}
+function refreshTagsPage(){const p=document.getElementById('tags-page');p.innerHTML='';const all=[...new Set(notes.flatMap(n=>n.tags))];if(!all.length){p.innerHTML='<div class="empty" style="width:100%;"><i class="ti ti-tag" aria-hidden="true"></i>لا توجد وسوم بعد</div>';return;}all.forEach(t=>{const cnt=notes.filter(n=>n.tags.includes(t)).length;const pill=document.createElement('div');pill.style.cssText='background:var(--purple-light);color:var(--purple-dark);border-radius:20px;padding:7px 14px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;';pill.innerHTML=`<i class="ti ti-tag" aria-hidden="true" style="font-size:14px;"></i>${t}<span style="background:rgba(124,58,237,0.2);border-radius:20px;padding:1px 7px;font-size:11px;">${cnt}</span>`;pill.onclick=()=>showTagNotes(t);p.appendChild(pill);});}
+function showTagNotes(tag){document.getElementById('tag-notes-sec').style.display='block';document.getElementById('tag-notes-lbl').textContent='وسم: '+tag;const list=document.getElementById('tag-notes-list');list.innerHTML='';notes.filter(n=>n.tags.includes(tag)).forEach(n=>{const c=document.createElement('div');c.className='nc';c.innerHTML=`<div style="flex:1;"><div class="nt">${n.title}</div><div class="nm"><span>${n.duration}</span><span>${n.date}</span></div></div><button class="btn-o" style="padding:6px 12px;font-size:12px;align-self:center;" onclick="editNote(${n.id})"><i class="ti ti-edit" aria-hidden="true" style="font-size:12px;"></i></button>`;list.appendChild(c);});}
+function clearAll(){if(confirm('حذف جميع الملاحظات؟')){notes=[];nextId=1;cancelEdit();save();renderNotesList();showToast('تم الحذف');}}
+function toggleDark(){darkMode=!darkMode;document.body.classList.toggle('dark',darkMode);document.getElementById('dark-tog').classList.toggle('on',darkMode);document.getElementById('dark-ic').className=darkMode?'ti ti-sun':'ti ti-moon';save();showToast(darkMode?'الوضع الداكن':'الوضع الفاتح');}
+
+let toastTimer=null;
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);}
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+initAuth();
+</script>
+</body>
+</html>

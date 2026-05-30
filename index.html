@@ -543,9 +543,11 @@ function setMicStatus(type,msg){
 }
 
 function getMicGuide(){
-  if(/iPad|iPhone|iPod/.test(navigator.userAgent)) return 'iPhone: الإعدادات ← Safari ← الميكروفون ← سماح، ثم أعد تحميل التطبيق';
-  if(/Android/.test(navigator.userAgent)) return 'Android: إعدادات الهاتف ← التطبيقات ← المتصفح ← الأذونات ← الميكروفون ← سماح';
-  return 'اضغط 🔒 بجانب الرابط ← الأذونات ← الميكروفون ← سماح';
+  if(/iPad|iPhone|iPod/.test(navigator.userAgent))
+    return 'iPhone: الإعدادات ← Safari ← الميكروفون ← سماح، ثم أعد فتح التطبيق';
+  if(/Android/.test(navigator.userAgent))
+    return 'الهاتف: إعدادات ← التطبيقات ← ابحث عن التطبيق ← الأذونات ← الميكروفون ← سماح، ثم أعد فتح التطبيق';
+  return 'اضغط 🔒 بجانب الرابط ← الأذونات ← الميكروفون ← سماح، ثم أعد تحميل الصفحة';
 }
 
 function getBestMimeType(){
@@ -554,21 +556,38 @@ function getBestMimeType(){
   return '';
 }
 
+function resetRecBtn(){
+  document.getElementById('btn-rec').disabled=false;
+  document.getElementById('btn-rec').innerHTML='<i class="ti ti-microphone" aria-hidden="true" style="font-size:13px;"></i> تسجيل';
+}
+
 function startRec(){
   if(isRecording)return;
   setMicStatus('','');
-  // Check if mediaDevices API exists at all
+
+  // Check if API exists
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    setMicStatus('err','المتصفح لا يدعم التسجيل الصوتي. استخدم Chrome أو Safari.');
+    setMicStatus('err','المتصفح لا يدعم التسجيل. افتح التطبيق عبر Chrome مباشرة.');
     return;
   }
+
   document.getElementById('btn-rec').disabled=true;
   document.getElementById('btn-rec').innerHTML='<i class="ti ti-loader" aria-hidden="true"></i> جارٍ التحضير...';
+
+  // Timeout: if getUserMedia doesn't respond in 6 seconds, the WebView is blocking it
+  var hangTimer=setTimeout(function(){
+    resetRecBtn();
+    showMicBanner(true);
+    setMicStatus('err','انتهت مهلة الميكروفون — يرجى منح الإذن من إعدادات الهاتف ثم إعادة فتح التطبيق');
+  },6000);
+
   navigator.mediaDevices.getUserMedia({audio:true})
     .then(function(stream){
-      document.getElementById('btn-rec').innerHTML='<i class="ti ti-microphone" aria-hidden="true" style="font-size:13px;"></i> تسجيل';
+      clearTimeout(hangTimer);
+      resetRecBtn();
       showMicBanner(false);
       setMicStatus('','');
+
       const mt=getBestMimeType();
       try{
         mediaRecorder=mt?new MediaRecorder(stream,{mimeType:mt}):new MediaRecorder(stream);
@@ -583,22 +602,30 @@ function startRec(){
         audioUrl=URL.createObjectURL(audioBlob);
         if(audioEl)audioEl.pause();
         audioEl=new Audio(audioUrl);
-        audioEl.onended=function(){isPlaying=false;document.getElementById('play-ic').className='ti ti-player-play';clearInterval(playInt);progress=0;document.getElementById('prog-fill').style.width='0%';};
+        audioEl.onended=function(){
+          isPlaying=false;
+          document.getElementById('play-ic').className='ti ti-player-play';
+          clearInterval(playInt);progress=0;
+          document.getElementById('prog-fill').style.width='0%';
+        };
         stream.getTracks().forEach(function(t){t.stop();});
       };
       mediaRecorder.start(250);
       beginRecUI();
     })
     .catch(function(e){
-      document.getElementById('btn-rec').disabled=false;
-      document.getElementById('btn-rec').innerHTML='<i class="ti ti-microphone" aria-hidden="true" style="font-size:13px;"></i> تسجيل';
+      clearTimeout(hangTimer);
+      resetRecBtn();
       if(e.name==='NotAllowedError'||e.name==='PermissionDeniedError'||e.name==='SecurityError'){
         showMicBanner(true);
         setMicStatus('err',getMicGuide());
       }else if(e.name==='NotFoundError'){
         setMicStatus('err','لم يتم العثور على ميكروفون في هذا الجهاز');
+      }else if(e.name==='NotSupportedError'){
+        setMicStatus('err','التطبيق يحتاج فتحه عبر https:// لتفعيل الميكروفون');
       }else{
-        setMicStatus('err','خطأ: '+e.name+' — '+e.message);
+        showMicBanner(true);
+        setMicStatus('err','يرجى منح إذن الميكروفون من إعدادات الهاتف ثم أعد فتح التطبيق');
       }
     });
 }

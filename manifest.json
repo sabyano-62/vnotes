@@ -2,7 +2,7 @@
   "name": "الملاحظات الصوتية",
   "short_name": "ملاحظاتي",
   "description": "تطبيق الملاحظات الصوتية — تسجيل، نسخ ذكي، تنظيم",
-  "start_url": "./index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f3f2f8",
   "theme_color": "#7C3AED",
@@ -23,6 +23,8 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["productivity", "utilities"],
-  "screenshots": []
+  "categories": [
+    "productivity",
+    "utilities"
+  ]
 }
